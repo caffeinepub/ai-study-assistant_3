@@ -25,6 +25,9 @@ const OPENAI_KEY_STORAGE = "openai-api-key";
 const GEMINI_KEY_STORAGE = "gemini-api-key";
 const PROVIDER_STORAGE = "ai-provider";
 
+// Default Gemini key (pre-configured)
+const DEFAULT_GEMINI_KEY = "AIzaSyAkFl-5AAUM1zzcCqKV5WW6VYPYiZyy7ok";
+
 function getOrCreateSessionId(): string {
   let id = localStorage.getItem(SESSION_ID_KEY);
   if (!id) {
@@ -48,10 +51,18 @@ export default function ChatPage() {
   const [sessionInitialized, setSessionInitialized] = useState(false);
 
   const [provider, setProvider] = useState<AIProvider>(
-    () => (localStorage.getItem(PROVIDER_STORAGE) as AIProvider) || "openai"
+    () => (localStorage.getItem(PROVIDER_STORAGE) as AIProvider) || "gemini"
   );
   const [openaiKey, setOpenaiKey] = useState(() => localStorage.getItem(OPENAI_KEY_STORAGE) || "");
-  const [geminiKey, setGeminiKey] = useState(() => localStorage.getItem(GEMINI_KEY_STORAGE) || "");
+  const [geminiKey, setGeminiKey] = useState(() => {
+    const stored = localStorage.getItem(GEMINI_KEY_STORAGE);
+    if (!stored) {
+      // Pre-fill default key
+      localStorage.setItem(GEMINI_KEY_STORAGE, DEFAULT_GEMINI_KEY);
+      return DEFAULT_GEMINI_KEY;
+    }
+    return stored;
+  });
   const [showApiKeyModal, setShowApiKeyModal] = useState(false);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -67,12 +78,12 @@ export default function ChatPage() {
   const isConnected = !!currentKey;
 
   // Scroll to bottom
-  const scrollToBottom = () => {
+  const scrollToBottom = useCallback(() => {
     const container = scrollContainerRef.current;
     if (container) {
       container.scrollTop = container.scrollHeight;
     }
-  };
+  }, []);
 
   // Initialize session and load history
   useEffect(() => {
@@ -113,11 +124,9 @@ export default function ChatPage() {
   }, [sessionInitialized, messages.length, chatHistory]);
 
   // Auto-scroll whenever messages or typing changes
-  // We intentionally re-run when message count or typing state changes
-  const messageCount = messages.length;
   useEffect(() => {
     scrollToBottom();
-  }, [messageCount, isTyping]);
+  }, [messages.length, isTyping, scrollToBottom]);
 
   const handleImageSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -252,19 +261,19 @@ export default function ChatPage() {
 
   const renderMessageContent = (content: string) => {
     const lines = content.split("\n");
-    return lines.map((line, i) => {
+    return lines.map((line, lineIdx) => {
       const parts = line.split(/(\*\*.*?\*\*)/g);
-      const rendered = parts.map((part) => {
+      const rendered = parts.map((part, partIdx) => {
         if (part.startsWith("**") && part.endsWith("**")) {
           const innerText = part.slice(2, -2);
-          return <strong key={`bold-${innerText}-${i}`} className="font-semibold">{innerText}</strong>;
+          return <strong key={`bold-${lineIdx}-${partIdx}`} className="font-semibold">{innerText}</strong>;
         }
-        return <span key={`text-${i}-${part.slice(0, 8)}`}>{part}</span>;
+        return <span key={`text-${lineIdx}-${partIdx}`}>{part}</span>;
       });
       return (
-        <span key={`line-${i}`}>
+        <span key={`line-${lineIdx}`}>
           {rendered}
-          {i < lines.length - 1 && <br />}
+          {lineIdx < lines.length - 1 && <br />}
         </span>
       );
     });
